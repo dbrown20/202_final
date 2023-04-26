@@ -1,0 +1,20 @@
+ rco - makes sure all arguments are atomic
+- select instructions -
+- assign homes - gives every variable a home (stack location)
+- allocate registers - get as close as possible to optimal allocation to locations in variables
+    - as many vars as possible should be placed  in stack location
+    - tries to reuse locations for multiple variables
+    - sees what vars can share and arranges them that way
+- typechecker - literally just check for correct types
+- explicate control - how we deal with if statements through stuctured control foow
+    - turns control flow into control flow graph using jumps or gotos
+    - intermediate language called cif -> basically Python without if statements
+- patch instructions - takes instructions that aren't and fixes them by using 'rax' register as temporary.
+
+- atomic - numbers, constants, and variable only
+
+- Need to brush up on 'control flow graph', from explicate control pass
+    - How to construct
+
+
+- For control flow graph, construct the diamond / nested diamond graphs that follows the if / else pattern
