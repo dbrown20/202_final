@@ -65,6 +65,29 @@ class Callable:
 
 TEnv = Dict[str, Callable | Tuple | type]
 
+# TODO: Here
+from typing import TypeVar
+T = TypeVar('T')
+
+from dataclasses import dataclass
+@dataclass
+class AnyVal:
+    val: any
+    tag: type
+
+def inject(val: T) -> AnyVal: # Call this on something with a known static type to get 'Any'
+    return AnyVal(val, type(val))
+
+def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the desired type
+    if tagged_val.tag == t:
+        return tagged_val.val
+    else:
+        raise Exception('run-time type error!')
+
+
+def case_insert():
+    pass
+# TODO: End
 
 def typecheck(program: Program) -> Program:
     """
@@ -171,7 +194,6 @@ def typecheck(program: Program) -> Program:
                 new_env['retval'] = return_type
                 tc_stmts(body_stmts, new_env)
                 function_names.add(name)
-
 
             case Return(e):
                 assert tc_exp(e, env) == env['retval']
@@ -283,6 +305,11 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
+# TODO: Here
+def reveal_casts():
+    pass
+# TODO: End
+
 
 ##################################################
 # expose-allocation
@@ -295,6 +322,7 @@ def rco(prog: Program) -> Program:
 #          | Return(Expr) | FunctionDef(str, List[Tuple[str, type]], List[Stmt], type)
 # Stmts  ::= List[Stmt]
 # LFun   ::= Program(Stmts)
+
 
 def expose_alloc(prog: Program) -> Program:
     """
@@ -564,6 +592,10 @@ def select_instructions(prog: cfun.CProgram) -> X86ProgramDefs:
 
     binop_instrs = {'add': 'addq', 'sub': 'subq', 'mult': 'imulq', 'and': 'andq', 'or': 'orq'}
 
+    # TODO: add three cases:
+    #   - make_any_of: make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
+    #   - tag_of: tag_of gets JUST the tag piece of a tagged value
+    #   - value_of: value_of gets JUST the value piece of a tagged value
     def si_stmt(stmt: cfun.Stmt) -> List[x86.Instr]:
         match stmt:
             case cfun.Assign(x, cfun.Var(f)):

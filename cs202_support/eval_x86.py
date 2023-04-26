@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from .parser_x86 import x86_parser, x86_parser_instrs
 
+
 import pandas as pd
 
 @dataclass
