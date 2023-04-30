@@ -72,8 +72,8 @@ def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the d
         raise Exception('run-time type error!')
 
 
-# def cast_insert(program: Program, t: T) -> Program:
 def cast_insert(program: Program) -> Program:
+# def cast_insert(program: Program, t: T) -> Program:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
@@ -263,7 +263,7 @@ def rco(prog: Program) -> Program:
     return Program(rco_stmts(prog.stmts))
 
 # TODO: Here
-def reveal_casts():
+def reveal_casts(program: Program) -> Program:
     # TODO: Compiles the casts into lower-level primitives. Put it after RCO, because it introduces new control flow
     #       Compiles both project and inject:
     #       Project compiles into an if statement that checks if the tag is correct and returns the value if so; otherwise it exits the program
