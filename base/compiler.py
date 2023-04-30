@@ -7,6 +7,7 @@ from cs202_support.python import *
 import cs202_support.x86 as x86
 import constants
 import cif
+from cs202_support.python_ast import Program
 from interference_graph import InterferenceGraph
 
 comparisons = ['eq', 'gt', 'gte', 'lt', 'lte']
@@ -71,7 +72,8 @@ def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the d
         raise Exception('run-time type error!')
 
 
-def cast_insert(program: Program, t: T) -> Program:
+# def cast_insert(program: Program, t: T) -> Program:
+def cast_insert(program: Program) -> Program:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
@@ -88,7 +90,8 @@ def cast_insert(program: Program, t: T) -> Program:
                 new_args = []
                 for exprs in args:  # TODO: Not sure if should loop through args or exprs list
                 # for exprs in new_exprs_list:
-                    new_type = project(exprs, t)  # Convert AnyVals to the desired type
+                    # new_type = project(exprs, t)  # Convert AnyVals to the desired type
+                    new_type = project(exprs, type(exprs.val))  # Convert AnyVals to the desired type
                     new_args.append(new_type)
                 new_expr = Prim(op, new_args)
                 new_exprs_list.append(inject(new_expr))
@@ -117,6 +120,11 @@ def typecheck(program: Program) -> Program:
         'gte':  [int, int],
         'lt':   [int, int],
         'lte':  [int, int],
+
+        # TODO: Added these, not sure if correct
+        'tag_of': [any],
+        'value_of': [any],
+        'make_any': [any, type],
     }
 
     prim_output_types = {
@@ -130,6 +138,11 @@ def typecheck(program: Program) -> Program:
         'gte':  bool,
         'lt':   bool,
         'lte':  bool,
+
+        # TODO: Added these, not sure if correct
+        'tag_of': type,  # Returns the tag, which is a 'type'
+        'value_of': any, # Returns the value, which is an 'any'
+        'make_any': any,
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -250,12 +263,40 @@ def rco(prog: Program) -> Program:
     return Program(rco_stmts(prog.stmts))
 
 # TODO: Here
-# Compiles the casts into lower-level primitives. Put it after RCO, because it introduces new control flow
-#       Compiles both project and inject:
-#       Project compiles into an if statement that checks if the tag is correct and returns the value
-#       Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
 def reveal_casts():
+    # TODO: Compiles the casts into lower-level primitives. Put it after RCO, because it introduces new control flow
+    #       Compiles both project and inject:
+    #       Project compiles into an if statement that checks if the tag is correct and returns the value if so; otherwise it exits the program
+    #       Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
+
+    # For part #1:
+    # - Use two primitives: 'tag_of' and 'value_of'
+    #     - 'tag_of' returns a tag of a value of type 'Any'
+    #     - 'value_of' returns the value of a value of type 'Any'
+    #
+    # For 'x=project(y, int)':
+    # We produce:
+    #
+    # if tag_of(y) == tag_of(int):
+    #     x = value_of(y)
+    # else:
+    #     exit()
+    #
+    # Can calculate the tag value at compile time (Binary tag values -> Book section 10.2, convert them to decimal values).
+    # Will deal with the 3 remaining primitives in select-instructions.
+
     pass
+
+
+
+
+
+
+
+
+
+
+
 # TODO: End
 
 ##################################################
@@ -380,6 +421,55 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
     #   - value_of: value_of gets JUST the value piece of a tagged value
     def si_stmt(stmt: cif.Stmt) -> List[x86.Instr]:
         match stmt:
+            # 1. make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
+            # 'x = make_any(5, 1)'
+            # =>
+            # '''
+            # - If not doing functions in dyn typin
+            # salq $3, #x  --shifts left by 3 bits
+            # orq $1, #x   -- adds the tag: 001
+            # TODO: Check correctness
+            case cif.Assign(x, cif.Prim('make_any', [atm1, atm2])):
+                return [x86.NamedInstr('movq', [si_atm(atm1), x86.Reg('rax')]),
+                        x86.NamedInstr('salq', [x86.Immediate(3), x86.Reg('rax')]),
+                        x86.NamedInstr('orq', [si_atm(atm2), x86.Reg('rax')]),
+                        x86.NamedInstr('movq', [x86.Reg('rax'), x86.Var(x)])]
+
+            # 2. tag_of gets JUST the tag piece of a tagged value
+            # 'tmp_4 = tag_of(x)'
+            # =>
+            # '''
+            # movq #x, #tmp_4  -- copy the tagged value to the destination
+            # andq $7, #tmp_4  -- erase everything except the tag (7 = 0b111)
+            # TODO: Check correctness
+            case cif.Assign(x, cif.Prim('tag_of', [atm1])):
+                return [x86.NamedInstr('movq', [si_atm(atm1), x86.Var(x)]),
+                        x86.NamedInstr('andq', [x86.Immediate(7), x86.Var(x)])]
+
+            # 3. value_of gets JUST the value piece of a tagged value
+            # 'tmp_1 = value_of(x)'
+            # =>
+            # '''
+            # movq #x, #tmp_1  -- move the tagged value to the destination
+            # sarq $3, #tmp_1  -- shift the tagged value 3 bits to the right, erasing the tag
+            # '''
+            # TODO: Check correctness
+            case cif.Assign(x, cif.Prim('value_of', [atm1])):
+                return [x86.NamedInstr('movq', [si_atm(atm1), x86.Var(x)]),
+                        x86.NamedInstr('sarq', [x86.Immediate(3), x86.Var(x)])]
+
+            # For the exit primitive, you can jump to 'main_conclusion' (which exits the program)
+            # TODO: Check correctness
+            case cif.Assign(x, cif.Prim('exit', [atm1])):
+                return [x86.NamedInstr('jmp', ['main_conclusion'])]
+
+            # TODO: END
+
+
+
+
+
+
             case cif.Assign(x, cif.Prim(op, [atm1, atm2])):
                 if op in binop_instrs:
                     return [x86.NamedInstr('movq', [si_atm(atm1), x86.Reg('rax')]),
@@ -727,9 +817,12 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
 # Compiler definition
 ##################################################
 
+# TODO: Added pass in here
 compiler_passes = {
+    'cast insert': cast_insert,
     'typecheck': typecheck,
     'remove complex opera*': rco,
+    'reveal cast': reveal_casts,
     'explicate control': explicate_control,
     'select instructions': select_instructions,
     'allocate registers': allocate_registers,
