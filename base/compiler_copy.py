@@ -1,3 +1,26 @@
+'''
+Group: Tyler Scott, Devin Brown, Olivia Welford
+
+Current Implementation:
+- We are starting with Assignment 4 base as recommended in the last lecture (to start without functions)
+
+    What we've done so far:
+      - General structure of compiler; added pass outlines in appropriate locations and put into compiler_passes dictionary
+      - cast_insert -> a few logical elements we are working out, but otherwise are close to finishing
+      - New cases in si_stmt -> Added necessary cases for make_any, tag_of, and value_of. Still adjusting as needed, but mostly set
+
+    What we still have to do:
+      - Need to correctly add 'any' type to typechecker; currently get an AssertionError at line 210 'assert t_e == env[x]', in the Assign case
+          - we think this is due to not filling primitive dictionaries correctly
+      - reveal_casts -> not started yet, biggest piece we have left to do
+
+    Unexpected challenges:
+      - We are unsure of the correct way to include the primitives for make_any, tag_of, and value_of
+          - Currently adding to each of the 'prim_...' dictionaries in typechecker
+      - Similarly we are trying to figure out how to use those primitives for the reveal_casts pass
+'''
+
+
 from typing import Set, Dict
 import itertools
 import sys
@@ -7,6 +30,7 @@ from cs202_support.python import *
 import cs202_support.x86 as x86
 import constants
 import cif
+from cs202_support.python_ast import Program
 from interference_graph import InterferenceGraph
 
 # TODO: HERE
@@ -56,6 +80,7 @@ def gensym(x):
 
 TEnv = Dict[str, type]
 
+
 # TODO: HERE
 T = TypeVar('T')
 @dataclass
@@ -103,14 +128,12 @@ def cast_insert(program: Program) -> Program:
     return Program(new_exprs_list)  # Return program of newly cast expressions
 # TODO: END
 
-
 def typecheck(program: Program) -> Program:
     """
     Typechecks the input program; throws an error if the program is not well-typed.
     :param program: The Lif program to typecheck
     :return: The program, if it is well-typed
     """
-
     prim_arg_types = {
         'add':   [int, int],
         'sub':   [int, int],
@@ -122,6 +145,12 @@ def typecheck(program: Program) -> Program:
         'gte':  [int, int],
         'lt':   [int, int],
         'lte':  [int, int],
+
+        # TODO: Not 100% sure on these
+        'any': [any],
+        'tag_of': [any],
+        'value_of': [any],
+        'make_any': [any, type],
     }
 
     prim_output_types = {
@@ -135,6 +164,12 @@ def typecheck(program: Program) -> Program:
         'gte':  bool,
         'lt':   bool,
         'lte':  bool,
+
+        # TODO: Not 100% sure on these
+        'any': any,
+        'tag_of': type,   # Returns the tag, which is a 'type'
+        'value_of': any,  # Returns the value, which is an 'any'
+        'make_any': any,
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -254,6 +289,55 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
+# TODO: Here
+# def reveal_casts(program: Program) -> Program:
+#     # TODO: Compiles the casts into lower-level primitives. Put it after RCO, because it introduces new control flow
+#     #       Compiles both project and inject:
+#     #       Project compiles into an if statement that checks if the tag is correct and returns the value if so; otherwise it exits the program
+#     #       Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
+#
+#     # For part #1:
+#     # - Use two primitives: 'tag_of' and 'value_of'
+#     #     - 'tag_of' returns a tag of a value of type 'Any'
+#     #     - 'value_of' returns the value of a value of type 'Any'
+#     #
+#     # For 'x=project(y, int)':
+#     # We produce:
+#     #
+#     # if tag_of(y) == tag_of(int):
+#     #     x = value_of(y)
+#     # else:
+#     #     exit()
+#     #
+#     # Can calculate the tag value at compile time (Binary tag values -> Book section 10.2, convert them to decimal values).
+#     # Will deal with the 3 remaining primitives in select-instructions.
+#     pass
+
+def reveal_casts(any_t: AnyVal):
+    # CHeck if an inject or project
+    match any_t:
+        case inject(any_t, t):
+            pass
+        case project(any_t, t):
+            if any_t.tag == int:
+                return any_t.value
+            elif any_t.tag == bool:
+                return any_t.value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# TODO: End
 
 ##################################################
 # explicate-control
@@ -371,9 +455,13 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
 
     binop_instrs = {'add': 'addq', 'sub': 'subq', 'mult': 'imulq', 'and': 'andq', 'or': 'orq'}
 
+    # TODO: add three cases:
+    #   - make_any: make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
+    #   - tag_of: tag_of gets JUST the tag piece of a tagged value
+    #   - value_of: value_of gets JUST the value piece of a tagged value
     def si_stmt(stmt: cif.Stmt) -> List[x86.Instr]:
         match stmt:
-                        # 1. make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
+            # 1. make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
             # 'x = make_any(5, 1)'
             # =>
             # '''
@@ -415,6 +503,8 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
                 # return [x86.NamedInstr('jmp', ['main_conclusion'])]
 
             # TODO: END
+
+
             case cif.Assign(x, cif.Prim(op, [atm1, atm2])):
                 if op in binop_instrs:
                     return [x86.NamedInstr('movq', [si_atm(atm1), x86.Reg('rax')]),
@@ -762,9 +852,12 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
 # Compiler definition
 ##################################################
 
+# TODO: Added pass in here
 compiler_passes = {
+    'cast insert': cast_insert,
     'typecheck': typecheck,
     'remove complex opera*': rco,
+    'reveal cast': reveal_casts,
     'explicate control': explicate_control,
     'select instructions': select_instructions,
     'allocate registers': allocate_registers,

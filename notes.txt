@@ -1,0 +1,7 @@
+'make_any' potential alternative:
+
+    case cif.Assign(x, cif.Prim('make_any', [atm1, atm2])):
+        return [x86.NamedInstr('movq', [si_atm(atm1), x86.Reg('rax')]),
+                x86.NamedInstr('salq', [x86.Immediate(3), x86.Reg('rax')]),
+                x86.NamedInstr('orq', [si_atm(atm2), x86.Reg('rax')]),
+                x86.NamedInstr('movq', [x86.Reg('rax'), x86.Var(x)])]
