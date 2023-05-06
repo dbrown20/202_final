@@ -122,6 +122,10 @@ def typecheck(program: Program) -> Program:
         'gte':  [int, int],
         'lt':   [int, int],
         'lte':  [int, int],
+
+        # TODO: HERE
+        'tag_of':  [AnyVal],
+        'value_of':  [AnyVal]
     }
 
     prim_output_types = {
@@ -135,6 +139,10 @@ def typecheck(program: Program) -> Program:
         'gte':  bool,
         'lt':   bool,
         'lte':  bool,
+
+        # TODO: HERE
+        'tag_of':  type,
+        'value_of':  AnyVal
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -171,10 +179,11 @@ def typecheck(program: Program) -> Program:
                 tc_exp(e, env)
             case Assign(x, e):
                 t_e = tc_exp(e, env)
-                if x in env:
-                    assert t_e == env[x]
-                else:
-                    env[x] = t_e
+                # if x in env:
+                #     assert t_e == env[x]
+                # else:
+                #     env[x] = t_e
+                env[x] = t_e
             case _:
                 raise Exception('tc_stmt', s)
 
@@ -253,6 +262,26 @@ def rco(prog: Program) -> Program:
                 raise Exception('rco_exp', e)
 
     return Program(rco_stmts(prog.stmts))
+
+# def reveal_casts(program: x86.X86Program, any_t: AnyVal) -> x86.X86Program:
+# def reveal_casts(program: x86.X86Program) -> x86.X86Program:
+def reveal_casts(program: x86.X86Program) -> x86.X86Program:
+
+    # compiling Project into a conditional
+    # expression that checks whether the value’s tag matches the target type; if it does,
+    # the value is converted to a value of the target type by removing the tag; if it does
+    # not, the program exits
+
+    # x = project(, int)
+
+    # if any_t.tag == int:
+    #     return any_t.val
+    # if any_t.tag == bool:
+    #     return any_t.val
+    # else:
+    #     exit()
+    pass
+
 
 
 ##################################################
@@ -763,7 +792,9 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
 ##################################################
 
 compiler_passes = {
+    'cast insert': cast_insert,
     'typecheck': typecheck,
+    'reveal casts': reveal_casts,
     'remove complex opera*': rco,
     'explicate control': explicate_control,
     'select instructions': select_instructions,
