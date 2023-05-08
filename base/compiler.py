@@ -405,37 +405,21 @@ def reveal_casts(program: Program) -> Program:
         # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
         match stmt:
             # TODO: ADDED
-            case Assign(x, Prim('project', [e, t])):
+            case Assign(x, Prim('tag_of', [e, t])):
                 if e.tag == t:
                     return [Assign(x, e.val)]
                 else:
                     exit()
+            case Assign(x, Prim('value_of', [e, t])):
+                return [Assign(x, e.val)]
             case Assign(x, Prim('inject', [e, t])):
-                return [Assign(x, e)]
+                return [Assign(x, Prim('make_any', [e, t]))]
             # TODO: END
 
             case If(cond, then_stmts, else_stmts):
                 return [If(cond, rv_stmts(then_stmts), rv_stmts(else_stmts))]
             case While(Begin(s1, cond), s2):
                 return [While(Begin(rv_stmts(s1), cond), rv_stmts(s2))]
-            # case Assign(x, Prim('tuple', args)):
-            #     new_stmts = []
-            #     num_bytes = 8 * (len(args) + 1)
-            #     new_fp = gensym('tmp')
-            #     lt_var = gensym('tmp')
-            #     tag = mk_tag(tuple_var_types[x])
-            #     new_stmts += [
-            #         Assign(new_fp, Prim('add', [Var('free_ptr'), Constant(num_bytes)])),
-            #         Assign(lt_var, Prim('lt', [Var(new_fp), Var('fromspace_end')])),
-            #         If(Var(lt_var),
-            #            [],
-            #            [Assign('_', Prim('collect', [Constant(num_bytes)]))]),
-            #         Assign(x, Prim('allocate', [Constant(num_bytes), Constant(tag)]))]
-            #
-            #     # fill in the values of the tuple
-            #     for i, a in enumerate(args):
-            #         new_stmts.append(Assign('_', Prim('tuple_set', [Var(x), Constant(i), a])))
-            #     return new_stmts
             case _:
                 return [stmt]
 
@@ -959,8 +943,8 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
 compiler_passes = {
     'cast insert': cast_insert,
     'typecheck': typecheck,
-    'reveal casts': reveal_casts,
     'remove complex opera*': rco,
+    'reveal casts': reveal_casts,
     'explicate control': explicate_control,
     'select instructions': select_instructions,
     'allocate registers': allocate_registers,
