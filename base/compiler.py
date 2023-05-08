@@ -79,49 +79,70 @@ def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the d
 # Stmt  ::= Assign(x, Expr) | Print(Expr) | If(Expr, Stmts, Stmts)
 # Stmts ::= List[Stmt]
 # LVar  ::= Program(Stmts)
-def cast_insert(expr: Expr) -> List[Expr]:
-# def cast_insert(program: Program, t: T) -> Program:
+def cast_insert(program: Program) -> Program:
+# def cast_insert(expr: Expr) -> List[Expr]:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
     #       use inject to convert the output to 'Any'
 
-    def ci_stmt(stmt: Stmt) -> Prim:
-        match stmt:
+    def ci_stmt(prim: Prim) -> Prim:
+        match prim:
+            case Constant(n):
+                if isinstance(n, int):
+                    return Prim('inject', [Constant(n), int])
+                elif isinstance(n, bool):
+                    return Prim('inject', [Constant(n), bool])
+                else:
+                    raise Exception('error!')
+            case Assign(x, e):
+                new_e = ci_expr(e)
+                return Prim('inject', [Prim('assign', [x, new_e]), None])
+            case Print(e):
+                new_e = ci_expr(e)
+                return Prim('inject', [Prim('print', [new_e]), None])
+            case If(e, s1, s2):
+                new_condition = ci_expr(e)
+                new_then_stmts = ci_stmts(s1)
+                new_else_stmts = ci_stmts(s2)
+                return Prim('inject', [Prim('if', [new_condition, new_then_stmts, new_else_stmts]), None])
+            case _:
+                raise Exception('ci_stmt', prim)
+
+    def ci_expr(expr: Expr) -> Prim:
+        match expr:
+            case Constant(n):
+                if isinstance(n, int):
+                    return Prim('inject', [Constant(n), int])
+                elif isinstance(n, bool):
+                    return Prim('inject', [Constant(n), bool])
+                else:
+                    raise Exception('error!')
+            case Var(x):
+                return Prim('inject', [Var(x), None])
             case Prim('add', [e1, e2]):
                 new_e1 = Prim('project', [ci_expr(e1), int])
                 new_e2 = Prim('project', [ci_expr(e2), int])
                 return Prim('inject', [Prim('add', [new_e1, new_e2]), int])
-            case _:
-                raise Exception('ci_stmt', stmt)
-
-
-    def ci_expr(expr: Expr) -> Prim:
-        match expr:
-            case Constant(val):
-                if isinstance(val, bool):
-                    return Prim('inject', [Constant(val), bool])
-                if isinstance(val, int):
-                    return Prim('inject', [Constant(val), int])
+            case Prim('eq', [e1, e2]):
+                new_e1 = Prim('project', [e1, int])
+                new_e2 = Prim('project', [e2, int])
+                return Prim('inject', [Prim('eq', [new_e1, new_e2]), bool])
             case _:
                 raise Exception('ci_expr', expr)
 
-    def ci_stmts(stmts: List[Stmt]) -> List[Stmt]:
-        new_stmts = []
-
-        for stmt in stmts:
+    def ci_stmts(prims: List[Prim]) -> List[Prim]:
+        new_prims = []
+        for prim in prims:
             bindings = {}
-            # (1) compile the statement
-            new_stmt = ci_stmt(stmt)
-            # (2) add the new bindings created by rco_exp
-            new_stmts.extend([Assign(x, e) for x, e in bindings.items()])
-            # (3) add the compiled statement itself
-            new_stmts.append(new_stmt)
+            new_stmt = ci_stmt(prim)
+            # new_stmts.extend([Assign(x, e) for x, e in bindings.items()])
+            new_prims.append(new_stmt)
 
-        return new_stmts
+        return new_prims
 
-
-    return ci_stmts(expr)
+    return program
+    # return Program(ci_stmts(program.stmts))
 # TODO: END
 
 
@@ -284,8 +305,6 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
-# def reveal_casts(program: x86.X86Program, any_t: AnyVal) -> x86.X86Program:
-# def reveal_casts(program: x86.X86Program) -> x86.X86Program:
 def reveal_casts(program: x86.X86Program) -> x86.X86Program:
 
     # compiling Project into a conditional
