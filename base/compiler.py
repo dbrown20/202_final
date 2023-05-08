@@ -7,6 +7,7 @@ from cs202_support.python import *
 import cs202_support.x86 as x86
 import constants
 import cif
+from cs202_support.python_ast import Prim
 from interference_graph import InterferenceGraph
 
 # TODO: HERE
@@ -73,34 +74,54 @@ def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the d
         raise Exception('run-time type error!')
 
 
-def cast_insert(program: Program) -> Program:
+# op    ::= "add" | "sub" | "not" | "or" | "and" | "eq" | "gt" | "gte" | "lt" | "lte"
+# Expr  ::= Var(x) | Constant(n) | Prim(op, List[Expr])
+# Stmt  ::= Assign(x, Expr) | Print(Expr) | If(Expr, Stmts, Stmts)
+# Stmts ::= List[Stmt]
+# LVar  ::= Program(Stmts)
+def cast_insert(expr: Expr) -> List[Expr]:
 # def cast_insert(program: Program, t: T) -> Program:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
     #       use inject to convert the output to 'Any'
 
-    new_exprs_list = []
-    curr_exprs_list = program.stmts  # Check each stmt for either Constant or Prim
-    for e in curr_exprs_list:
-        match e:
-            case Constant(val):
-                new_any = inject(val)  # Make AnyVal type
-                new_exprs_list.append(new_any)
-            case Prim(op, args):
-                new_args = []
-                for exprs in args:  # TODO: Not sure if should loop through args or exprs list?
-                # for exprs in new_exprs_list:
-                    # new_type = project(exprs, t)  # Convert AnyVals to the desired type
-                    new_type = project(exprs, type(exprs.val))  # TODO: Not sure if correct way to get type
-                    new_args.append(new_type)
-                new_expr = Prim(op, new_args)
-                new_exprs_list.append(inject(new_expr))
+    def ci_stmt(stmt: Stmt) -> Prim:
+        match stmt:
+            case Prim('add', [e1, e2]):
+                new_e1 = Prim('project', [ci_expr(e1), int])
+                new_e2 = Prim('project', [ci_expr(e2), int])
+                return Prim('inject', [Prim('add', [new_e1, new_e2]), int])
             case _:
-                new_exprs_list.append(e)  # TODO: Seems weird, but return type error otherwise
-                # raise Exception('cast_insert', e)
+                raise Exception('ci_stmt', stmt)
 
-    return Program(new_exprs_list)  # Return program of newly cast expressions
+
+    def ci_expr(expr: Expr) -> Prim:
+        match expr:
+            case Constant(val):
+                if isinstance(val, bool):
+                    return Prim('inject', [Constant(val), bool])
+                if isinstance(val, int):
+                    return Prim('inject', [Constant(val), int])
+            case _:
+                raise Exception('ci_expr', expr)
+
+    def ci_stmts(stmts: List[Stmt]) -> List[Stmt]:
+        new_stmts = []
+
+        for stmt in stmts:
+            bindings = {}
+            # (1) compile the statement
+            new_stmt = ci_stmt(stmt)
+            # (2) add the new bindings created by rco_exp
+            new_stmts.extend([Assign(x, e) for x, e in bindings.items()])
+            # (3) add the compiled statement itself
+            new_stmts.append(new_stmt)
+
+        return new_stmts
+
+
+    return ci_stmts(expr)
 # TODO: END
 
 
