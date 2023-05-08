@@ -1,5 +1,5 @@
 
-var = 10
+var = True
 
 if 10 == 9:
     var = 10
