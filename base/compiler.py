@@ -178,7 +178,8 @@ def typecheck(program: Program) -> Program:
 
         # TODO: HERE
         'tag_of': [AnyVal],
-        'value_of': [AnyVal]
+        'value_of': [AnyVal],
+        'make_any': [AnyVal]
     }
 
     prim_output_types = {
@@ -195,7 +196,8 @@ def typecheck(program: Program) -> Program:
 
         # TODO: HERE
         'tag_of': type,
-        'value_of': AnyVal
+        'value_of': AnyVal,
+        'make_any': AnyVal
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -378,6 +380,8 @@ def reveal_casts(program: Program) -> Program:
                     return [Assign(x, e.val)]
                 else:
                     exit()
+            # case Assign(x, Prim('value_of', [e, t])):
+            #     return [Assign(x, e.val)]
             case Assign(x, Prim('value_of', [e, t])):
                 return [Assign(x, e.val)]
             case Assign(x, Prim('inject', [e, t])):
