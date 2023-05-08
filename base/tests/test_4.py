@@ -1,5 +1,5 @@
 
-var = 10
+var = False
 
 if 10 == 9:
     x = 10
