@@ -86,7 +86,7 @@ def cast_insert(program: Program) -> Program:
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
     #       use inject to convert the output to 'Any'
 
-    def ci_stmt(prim: Prim) -> Prim:
+    def ci_prim(prim: Prim) -> Prim:
         match prim:
             case Constant(n):
                 if isinstance(n, int):
@@ -103,8 +103,8 @@ def cast_insert(program: Program) -> Program:
                 return Prim('inject', [Prim('print', [new_e]), None])
             case If(e, s1, s2):
                 new_condition = ci_expr(e)
-                new_then_stmts = ci_stmts(s1)
-                new_else_stmts = ci_stmts(s2)
+                new_then_stmts = ci_prims(s1)
+                new_else_stmts = ci_prims(s2)
                 return Prim('inject', [Prim('if', [new_condition, new_then_stmts, new_else_stmts]), None])
             case _:
                 raise Exception('ci_stmt', prim)
@@ -131,18 +131,17 @@ def cast_insert(program: Program) -> Program:
             case _:
                 raise Exception('ci_expr', expr)
 
-    def ci_stmts(prims: List[Prim]) -> List[Prim]:
+    def ci_prims(prims: List[Prim]) -> List[Prim]:
         new_prims = []
         for prim in prims:
             bindings = {}
-            new_stmt = ci_stmt(prim)
+            new_prim = ci_prim(prim)
             # new_stmts.extend([Assign(x, e) for x, e in bindings.items()])
-            new_prims.append(new_stmt)
+            new_prims.append(new_prim)
 
         return new_prims
 
     return program
-    # return Program(ci_stmts(program.stmts))
 # TODO: END
 
 
@@ -305,7 +304,13 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
-def reveal_casts(program: x86.X86Program) -> x86.X86Program:
+# op    ::= "add" | "sub" | "not" | "or" | "and" | "eq" | "gt" | "gte" | "lt" | "lte"
+# Expr  ::= Var(x) | Constant(n) | Prim(op, List[Expr])
+# Stmt  ::= Assign(x, Expr) | Print(Expr) | If(Expr, Stmts, Stmts)
+# Stmts ::= List[Stmt]
+# LVar  ::= Program(Stmts)
+# def reveal_casts(program: x86.X86Program) -> x86.X86Program:
+def reveal_casts(program: Program) -> Program:
 
     # compiling Project into a conditional
     # expression that checks whether the value’s tag matches the target type; if it does,
@@ -320,7 +325,45 @@ def reveal_casts(program: x86.X86Program) -> x86.X86Program:
     #     return any_t.val
     # else:
     #     exit()
-    pass
+
+    # The reveal_casts pass compiles project and inject.
+    # 1. Project compiles into an if statement that checks if the tag is correct and returns the value
+    # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
+
+    def rc_expr(e: Expr) -> Expr:
+        match e:
+            case Var(x):
+                return Var(x)
+            case Constant(n):
+                if isinstance(n, int):
+                    return Prim('inject', [Constant(n), int])
+                elif isinstance(n, bool):
+                    return Prim('inject', [Constant(n), bool])
+                else:
+                    raise Exception('error!')
+            case Prim(op, args):
+                new_args = [rc_expr(e) for e in args]
+                return Prim(op, new_args)
+            case _:
+                raise Exception('ci_expr', e)
+    def rc_prim(prims: Prim) -> AnyVal:
+        match prims:
+            case Prim('project', [e, t]):
+                if e.tag == t:
+                    prims = e.val
+                    return prims
+                else:
+                    exit()
+            case _:
+                raise Exception('rc_prim', prims)
+
+
+    def rc_prims(prim: Prim) -> Prim:
+        pass
+
+
+    return program
+
 
 
 
@@ -442,7 +485,7 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
 
     def si_stmt(stmt: cif.Stmt) -> List[x86.Instr]:
         match stmt:
-                        # 1. make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
+            # 1. make_any adds the tag: shifts the value 3 bits to the left, then adds the tag to the value
             # 'x = make_any(5, 1)'
             # =>
             # '''
