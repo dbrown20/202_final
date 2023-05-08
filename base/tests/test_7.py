@@ -2,5 +2,5 @@
 var = 10
 
 if 10 == 9:
-    var = 10
+    x = 10
 print(var)

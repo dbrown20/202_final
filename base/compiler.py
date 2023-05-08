@@ -14,6 +14,7 @@ from interference_graph import InterferenceGraph
 # Imports needed for Dynamic Typing
 from typing import TypeVar
 from dataclasses import dataclass
+
 # TODO: END
 
 comparisons = ['eq', 'gt', 'gte', 'lt', 'lte']
@@ -60,15 +61,19 @@ TEnv = Dict[str, type]
 
 # TODO: HERE
 T = TypeVar('T')
+
+
 @dataclass
 class AnyVal:
     val: any
     tag: type
 
-def inject(val: T) -> AnyVal: # Call this on something with a known static type to get 'Any'
+
+def inject(val: T) -> AnyVal:  # Call this on something with a known static type to get 'Any'
     return AnyVal(val, type(val))
 
-def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the desired type
+
+def project(tagged_val: AnyVal, t: T) -> T:  # Call this on an 'Any' to get the desired type
     if tagged_val.tag == t:
         return tagged_val.val
     else:
@@ -81,7 +86,7 @@ def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the d
 # Stmts ::= List[Stmt]
 # LVar  ::= Program(Stmts)
 def cast_insert(program: Program) -> Program:
-# def cast_insert(expr: Expr) -> List[Expr]:
+    # def cast_insert(expr: Expr) -> List[Expr]:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
@@ -147,6 +152,8 @@ def cast_insert(program: Program) -> Program:
         return new_prims
 
     return program
+
+
 # TODO: END
 
 
@@ -158,37 +165,37 @@ def typecheck(program: Program) -> Program:
     """
 
     prim_arg_types = {
-        'add':   [int, int],
-        'sub':   [int, int],
-        'mult':  [int, int],
+        'add': [int, int],
+        'sub': [int, int],
+        'mult': [int, int],
         'not': [bool],
-        'or':  [bool, bool],
-        'and':  [bool, bool],
-        'gt':   [int, int],
-        'gte':  [int, int],
-        'lt':   [int, int],
-        'lte':  [int, int],
+        'or': [bool, bool],
+        'and': [bool, bool],
+        'gt': [int, int],
+        'gte': [int, int],
+        'lt': [int, int],
+        'lte': [int, int],
 
         # TODO: HERE
-        'tag_of':  [AnyVal],
-        'value_of':  [AnyVal]
+        'tag_of': [AnyVal],
+        'value_of': [AnyVal]
     }
 
     prim_output_types = {
-        'add':   int,
-        'sub':   int,
-        'mult':  int,
+        'add': int,
+        'sub': int,
+        'mult': int,
         'not': bool,
-        'or':  bool,
-        'and':  bool,
-        'gt':   bool,
-        'gte':  bool,
-        'lt':   bool,
-        'lte':  bool,
+        'or': bool,
+        'and': bool,
+        'gt': bool,
+        'gte': bool,
+        'lt': bool,
+        'lte': bool,
 
         # TODO: HERE
-        'tag_of':  type,
-        'value_of':  AnyVal
+        'tag_of': type,
+        'value_of': AnyVal
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -309,6 +316,7 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
+
 # op    ::= "add" | "sub" | "not" | "or" | "and" | "eq" | "gt" | "gte" | "lt" | "lte"
 # Expr  ::= Var(x) | Constant(n) | Prim(op, List[Expr])
 # Stmt  ::= Assign(x, Expr) | Print(Expr) | If(Expr, Stmts, Stmts)
@@ -316,7 +324,6 @@ def rco(prog: Program) -> Program:
 # LVar  ::= Program(Stmts)
 # def reveal_casts(program: x86.X86Program) -> x86.X86Program:
 def reveal_casts(program: Program) -> Program:
-
     # compiling Project into a conditional
     # expression that checks whether the value’s tag matches the target type; if it does,
     # the value is converted to a value of the target type by removing the tag; if it does
@@ -343,14 +350,13 @@ def reveal_casts(program: Program) -> Program:
 
         # shift the pointer mask by 6 bits to make room for the length field
         mask_and_len = pointer_mask << 6
-        mask_and_len = mask_and_len + len(types) # add the length
+        mask_and_len = mask_and_len + len(types)  # add the length
 
         # shift the mask and length by 1 bit to make room for the forwarding bit
         tag = mask_and_len << 1
         tag = tag + 1
 
         return tag
-
 
     def rv_stmt(stmt: Stmt) -> List[Stmt]:
         # x = project(, int)
@@ -379,7 +385,7 @@ def reveal_casts(program: Program) -> Program:
             # Inject(e, ftype)
             # ⇒
             # Call(Name('make_any'), [e′, Constant(tagof (ftype))])
-            case Assign (x, Prim('inject', [e, t])):
+            case Assign(x, Prim('inject', [e, t])):
 
                 return [Assign(x, Prim('make_any', [e, Constant(mk_tag(t))]))]
             # TODO: END
@@ -398,7 +404,6 @@ def reveal_casts(program: Program) -> Program:
         return new_stmts
 
     return Program(rv_stmts(program.stmts))
-
 
 
 ##################################################
@@ -462,7 +467,7 @@ def explicate_control(prog: Program) -> cif.CProgram:
                 return [cif.If(explicate_exp(condition),
                                cif.Goto(e2_label),
                                cif.Goto(e3_label))]
-                
+
             case _:
                 raise RuntimeError(stmt)
 
@@ -611,6 +616,7 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
 Color = int
 Coloring = Dict[x86.Var, Color]
 Saturation = Set[Color]
+
 
 def allocate_registers(program: x86.X86Program) -> x86.X86Program:
     """
@@ -809,7 +815,7 @@ def allocate_registers(program: x86.X86Program) -> x86.X86Program:
             r = available_registers.pop()
             color_map[color] = x86.Reg(r)
         else:
-            offset = stack_locations_used+1
+            offset = stack_locations_used + 1
             color_map[color] = x86.Deref('rbp', -(offset * 8))
             stack_locations_used += 1
 
@@ -821,7 +827,7 @@ def allocate_registers(program: x86.X86Program) -> x86.X86Program:
     # Step 5: replace variables with their homes
     blocks = program.blocks
     new_blocks = {label: ah_block(block) for label, block in blocks.items()}
-    return x86.X86Program(new_blocks, stack_space = align(8 * stack_locations_used))
+    return x86.X86Program(new_blocks, stack_space=align(8 * stack_locations_used))
 
 
 ##################################################
@@ -848,8 +854,8 @@ def patch_instructions(program: x86.X86Program) -> x86.X86Program:
                 return [x86.NamedInstr('movq', [x86.Deref(r1, o1), x86.Reg('rax')]),
                         x86.NamedInstr(i, [x86.Reg('rax'), x86.Deref(r2, o2)])]
             case x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Deref(r2, o2)]):
-                    return [x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Reg('rax')]),
-                            x86.NamedInstr('movq', [x86.Reg('rax'), x86.Deref(r2, o2)])]
+                return [x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Reg('rax')]),
+                        x86.NamedInstr('movq', [x86.Reg('rax'), x86.Deref(r2, o2)])]
             case x86.NamedInstr('cmpq', [a1, x86.Immediate(i)]):
                 return [x86.NamedInstr('movq', [x86.Immediate(i), x86.Reg('rax')]),
                         x86.NamedInstr('cmpq', [a1, x86.Reg('rax')])]
@@ -866,7 +872,7 @@ def patch_instructions(program: x86.X86Program) -> x86.X86Program:
 
     blocks = program.blocks
     new_blocks = {label: pi_block(block) for label, block in blocks.items()}
-    return x86.X86Program(new_blocks, stack_space = program.stack_space)
+    return x86.X86Program(new_blocks, stack_space=program.stack_space)
 
 
 ##################################################
@@ -888,9 +894,9 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
     """
 
     prelude = [x86.NamedInstr('pushq', [x86.Reg('rbp')]),
-               x86.NamedInstr('movq',  [x86.Reg('rsp'), x86.Reg('rbp')]),
-               x86.NamedInstr('subq',  [x86.Immediate(program.stack_space),
-                                        x86.Reg('rsp')]),
+               x86.NamedInstr('movq', [x86.Reg('rsp'), x86.Reg('rbp')]),
+               x86.NamedInstr('subq', [x86.Immediate(program.stack_space),
+                                       x86.Reg('rsp')]),
                x86.Jmp('start')]
 
     conclusion = [x86.NamedInstr('addq', [x86.Immediate(program.stack_space),
@@ -901,7 +907,7 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
     new_blocks = program.blocks.copy()
     new_blocks['main'] = prelude
     new_blocks['conclusion'] = conclusion
-    return x86.X86Program(new_blocks, stack_space = program.stack_space)
+    return x86.X86Program(new_blocks, stack_space=program.stack_space)
 
 
 ##################################################
@@ -978,4 +984,3 @@ if __name__ == '__main__':
             except:
                 print('Error during compilation! **************************************************')
                 traceback.print_exception(*sys.exc_info())
-
