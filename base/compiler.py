@@ -92,6 +92,8 @@ def cast_insert(program: Program) -> Program:
             case Constant(n):
                 if isinstance(n, int):
                     return Prim('inject', [Constant(n), int])
+                if isinstance(n, str):
+                    return Prim('inject', [Constant(n), str])
                 elif isinstance(n, bool):
                     return Prim('inject', [Constant(n), bool])
                 else:
@@ -115,6 +117,8 @@ def cast_insert(program: Program) -> Program:
             case Constant(n):
                 if isinstance(n, int):
                     return Prim('inject', [Constant(n), int])
+                elif isinstance(n, str):
+                    return Prim('inject', [Constant(n), str])
                 elif isinstance(n, bool):
                     return Prim('inject', [Constant(n), bool])
                 else:
@@ -318,48 +322,6 @@ def reveal_casts(program: Program) -> Program:
     # the value is converted to a value of the target type by removing the tag; if it does
     # not, the program exits
 
-    # x = project(, int)
-
-    # if any_t.tag == int:
-    #     return any_t.val
-    # if any_t.tag == bool:
-    #     return any_t.val
-    # else:
-    #     exit()
-
-    # The reveal_casts pass compiles project and inject.
-    # 1. Project compiles into an if statement that checks if the tag is correct and returns the value
-    # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
-
-    # def rc_expr(e: Expr) -> Expr:
-    #     match e:
-    #         case Var(x):
-    #             return Var(x)
-    #         case Constant(n):
-    #             if isinstance(n, int):
-    #                 return Prim('inject', [Constant(n), int])
-    #             elif isinstance(n, bool):
-    #                 return Prim('inject', [Constant(n), bool])
-    #             else:
-    #                 raise Exception('error!')
-    #         case Prim(op, args):
-    #             new_args = [rc_expr(e) for e in args]
-    #             return Prim(op, new_args)
-    #         case _:
-    #             raise Exception('ci_expr', e)
-    #
-    # def rc_prim(prims: Prim) -> AnyVal:
-    #     match prims:
-    #         case Prim('project', [e, t]):
-    #             if e.tag == t:
-    #                 prims = e.val
-    #                 return prims
-    #             else:
-    #                 exit()
-    #         case _:
-    #             raise Exception('rc_prim', prims)
-
-
     def mk_tag(types: Tuple[type]) -> int:
         """
         Builds a vector tag. See section 5.2.2 in the textbook.
@@ -405,37 +367,27 @@ def reveal_casts(program: Program) -> Program:
         # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
         match stmt:
             # TODO: ADDED
-            case Assign(x, Prim('project', [e, t])):
+            case Assign(x, Prim('tag_of', [e, t])):
                 if e.tag == t:
                     return [Assign(x, e.val)]
                 else:
                     exit()
+            case Assign(x, Prim('value_of', [e, t])):
+                return [Assign(x, e.val)]
             case Assign(x, Prim('inject', [e, t])):
-                return [Assign(x, e)]
+                return [Assign(x, Prim('make_any', [e, t]))]
+            # Inject(e, ftype)
+            # ⇒
+            # Call(Name('make_any'), [e′, Constant(tagof (ftype))])
+            case Assign (x, Prim('inject', [e, t])):
+
+                return [Assign(x, Prim('make_any', [e, Constant(mk_tag(t))]))]
             # TODO: END
 
             case If(cond, then_stmts, else_stmts):
                 return [If(cond, rv_stmts(then_stmts), rv_stmts(else_stmts))]
             case While(Begin(s1, cond), s2):
                 return [While(Begin(rv_stmts(s1), cond), rv_stmts(s2))]
-            # case Assign(x, Prim('tuple', args)):
-            #     new_stmts = []
-            #     num_bytes = 8 * (len(args) + 1)
-            #     new_fp = gensym('tmp')
-            #     lt_var = gensym('tmp')
-            #     tag = mk_tag(tuple_var_types[x])
-            #     new_stmts += [
-            #         Assign(new_fp, Prim('add', [Var('free_ptr'), Constant(num_bytes)])),
-            #         Assign(lt_var, Prim('lt', [Var(new_fp), Var('fromspace_end')])),
-            #         If(Var(lt_var),
-            #            [],
-            #            [Assign('_', Prim('collect', [Constant(num_bytes)]))]),
-            #         Assign(x, Prim('allocate', [Constant(num_bytes), Constant(tag)]))]
-            #
-            #     # fill in the values of the tuple
-            #     for i, a in enumerate(args):
-            #         new_stmts.append(Assign('_', Prim('tuple_set', [Var(x), Constant(i), a])))
-            #     return new_stmts
             case _:
                 return [stmt]
 
@@ -959,8 +911,8 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
 compiler_passes = {
     'cast insert': cast_insert,
     'typecheck': typecheck,
-    'reveal casts': reveal_casts,
     'remove complex opera*': rco,
+    'reveal casts': reveal_casts,
     'explicate control': explicate_control,
     'select instructions': select_instructions,
     'allocate registers': allocate_registers,
