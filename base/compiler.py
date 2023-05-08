@@ -14,7 +14,6 @@ from interference_graph import InterferenceGraph
 # Imports needed for Dynamic Typing
 from typing import TypeVar
 from dataclasses import dataclass
-
 # TODO: END
 
 comparisons = ['eq', 'gt', 'gte', 'lt', 'lte']
@@ -60,19 +59,15 @@ TEnv = Dict[str, type]
 
 # TODO: HERE
 T = TypeVar('T')
-
-
 @dataclass
 class AnyVal:
     val: any
     tag: type
 
-
-def inject(val: T) -> AnyVal:  # Call this on something with a known static type to get 'Any'
+def inject(val: T) -> AnyVal: # Call this on something with a known static type to get 'Any'
     return AnyVal(val, type(val))
 
-
-def project(tagged_val: AnyVal, t: T) -> T:  # Call this on an 'Any' to get the desired type
+def project(tagged_val: AnyVal, t: T) -> T: # Call this on an 'Any' to get the desired type
     if tagged_val.tag == t:
         return tagged_val.val
     else:
@@ -85,13 +80,13 @@ def project(tagged_val: AnyVal, t: T) -> T:  # Call this on an 'Any' to get the 
 # Stmts ::= List[Stmt]
 # LVar  ::= Program(Stmts)
 def cast_insert(program: Program) -> Program:
-    # def cast_insert(expr: Expr) -> List[Expr]:
+# def cast_insert(expr: Expr) -> List[Expr]:
     # Compile 'Ldyn' to 'Lany' by adding inject and project operations
     # For each constant: use inject to convert the constant into a tagged 'Any' value
     # For each primitive; use 'project' to projects the inputs to the correct expected types;
     #       use inject to convert the output to 'Any'
 
-    def ci_stmt(prim: Prim) -> Prim:
+    def ci_prim(prim: Prim) -> Prim:
         match prim:
             case Constant(n):
                 if isinstance(n, int):
@@ -108,8 +103,8 @@ def cast_insert(program: Program) -> Program:
                 return Prim('inject', [Prim('print', [new_e]), None])
             case If(e, s1, s2):
                 new_condition = ci_expr(e)
-                new_then_stmts = ci_stmts(s1)
-                new_else_stmts = ci_stmts(s2)
+                new_then_stmts = ci_prims(s1)
+                new_else_stmts = ci_prims(s2)
                 return Prim('inject', [Prim('if', [new_condition, new_then_stmts, new_else_stmts]), None])
             case _:
                 raise Exception('ci_stmt', prim)
@@ -136,20 +131,17 @@ def cast_insert(program: Program) -> Program:
             case _:
                 raise Exception('ci_expr', expr)
 
-    def ci_stmts(prims: List[Prim]) -> List[Prim]:
+    def ci_prims(prims: List[Prim]) -> List[Prim]:
         new_prims = []
         for prim in prims:
             bindings = {}
-            new_stmt = ci_stmt(prim)
+            new_prim = ci_prim(prim)
             # new_stmts.extend([Assign(x, e) for x, e in bindings.items()])
-            new_prims.append(new_stmt)
+            new_prims.append(new_prim)
 
         return new_prims
 
     return program
-    # return Program(ci_stmts(program.stmts))
-
-
 # TODO: END
 
 
@@ -161,37 +153,37 @@ def typecheck(program: Program) -> Program:
     """
 
     prim_arg_types = {
-        'add': [int, int],
-        'sub': [int, int],
-        'mult': [int, int],
+        'add':   [int, int],
+        'sub':   [int, int],
+        'mult':  [int, int],
         'not': [bool],
-        'or': [bool, bool],
-        'and': [bool, bool],
-        'gt': [int, int],
-        'gte': [int, int],
-        'lt': [int, int],
-        'lte': [int, int],
+        'or':  [bool, bool],
+        'and':  [bool, bool],
+        'gt':   [int, int],
+        'gte':  [int, int],
+        'lt':   [int, int],
+        'lte':  [int, int],
 
         # TODO: HERE
-        'tag_of': [AnyVal],
-        'value_of': [AnyVal]
+        'tag_of':  [AnyVal],
+        'value_of':  [AnyVal]
     }
 
     prim_output_types = {
-        'add': int,
-        'sub': int,
-        'mult': int,
+        'add':   int,
+        'sub':   int,
+        'mult':  int,
         'not': bool,
-        'or': bool,
-        'and': bool,
-        'gt': bool,
-        'gte': bool,
-        'lt': bool,
-        'lte': bool,
+        'or':  bool,
+        'and':  bool,
+        'gt':   bool,
+        'gte':  bool,
+        'lt':   bool,
+        'lte':  bool,
 
         # TODO: HERE
-        'tag_of': type,
-        'value_of': AnyVal
+        'tag_of':  type,
+        'value_of':  AnyVal
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -312,8 +304,14 @@ def rco(prog: Program) -> Program:
 
     return Program(rco_stmts(prog.stmts))
 
+# op    ::= "add" | "sub" | "not" | "or" | "and" | "eq" | "gt" | "gte" | "lt" | "lte"
+# Expr  ::= Var(x) | Constant(n) | Prim(op, List[Expr])
+# Stmt  ::= Assign(x, Expr) | Print(Expr) | If(Expr, Stmts, Stmts)
+# Stmts ::= List[Stmt]
+# LVar  ::= Program(Stmts)
+# def reveal_casts(program: x86.X86Program) -> x86.X86Program:
+def reveal_casts(program: Program) -> Program:
 
-def reveal_casts(program: x86.X86Program) -> x86.X86Program:
     # compiling Project into a conditional
     # expression that checks whether the value’s tag matches the target type; if it does,
     # the value is converted to a value of the target type by removing the tag; if it does
@@ -327,7 +325,46 @@ def reveal_casts(program: x86.X86Program) -> x86.X86Program:
     #     return any_t.val
     # else:
     #     exit()
-    pass
+
+    # The reveal_casts pass compiles project and inject.
+    # 1. Project compiles into an if statement that checks if the tag is correct and returns the value
+    # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
+
+    def rc_expr(e: Expr) -> Expr:
+        match e:
+            case Var(x):
+                return Var(x)
+            case Constant(n):
+                if isinstance(n, int):
+                    return Prim('inject', [Constant(n), int])
+                elif isinstance(n, bool):
+                    return Prim('inject', [Constant(n), bool])
+                else:
+                    raise Exception('error!')
+            case Prim(op, args):
+                new_args = [rc_expr(e) for e in args]
+                return Prim(op, new_args)
+            case _:
+                raise Exception('ci_expr', e)
+    def rc_prim(prims: Prim) -> AnyVal:
+        match prims:
+            case Prim('project', [e, t]):
+                if e.tag == t:
+                    prims = e.val
+                    return prims
+                else:
+                    exit()
+            case _:
+                raise Exception('rc_prim', prims)
+
+
+    def rc_prims(prim: Prim) -> Prim:
+        pass
+
+
+    return program
+
+
 
 
 ##################################################
@@ -391,7 +428,7 @@ def explicate_control(prog: Program) -> cif.CProgram:
                 return [cif.If(explicate_exp(condition),
                                cif.Goto(e2_label),
                                cif.Goto(e3_label))]
-
+                
             case _:
                 raise RuntimeError(stmt)
 
@@ -540,7 +577,6 @@ def select_instructions(prog: cif.CProgram) -> x86.X86Program:
 Color = int
 Coloring = Dict[x86.Var, Color]
 Saturation = Set[Color]
-
 
 def allocate_registers(program: x86.X86Program) -> x86.X86Program:
     """
@@ -739,7 +775,7 @@ def allocate_registers(program: x86.X86Program) -> x86.X86Program:
             r = available_registers.pop()
             color_map[color] = x86.Reg(r)
         else:
-            offset = stack_locations_used + 1
+            offset = stack_locations_used+1
             color_map[color] = x86.Deref('rbp', -(offset * 8))
             stack_locations_used += 1
 
@@ -751,7 +787,7 @@ def allocate_registers(program: x86.X86Program) -> x86.X86Program:
     # Step 5: replace variables with their homes
     blocks = program.blocks
     new_blocks = {label: ah_block(block) for label, block in blocks.items()}
-    return x86.X86Program(new_blocks, stack_space=align(8 * stack_locations_used))
+    return x86.X86Program(new_blocks, stack_space = align(8 * stack_locations_used))
 
 
 ##################################################
@@ -778,8 +814,8 @@ def patch_instructions(program: x86.X86Program) -> x86.X86Program:
                 return [x86.NamedInstr('movq', [x86.Deref(r1, o1), x86.Reg('rax')]),
                         x86.NamedInstr(i, [x86.Reg('rax'), x86.Deref(r2, o2)])]
             case x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Deref(r2, o2)]):
-                return [x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Reg('rax')]),
-                        x86.NamedInstr('movq', [x86.Reg('rax'), x86.Deref(r2, o2)])]
+                    return [x86.NamedInstr('movzbq', [x86.Deref(r1, o1), x86.Reg('rax')]),
+                            x86.NamedInstr('movq', [x86.Reg('rax'), x86.Deref(r2, o2)])]
             case x86.NamedInstr('cmpq', [a1, x86.Immediate(i)]):
                 return [x86.NamedInstr('movq', [x86.Immediate(i), x86.Reg('rax')]),
                         x86.NamedInstr('cmpq', [a1, x86.Reg('rax')])]
@@ -796,7 +832,7 @@ def patch_instructions(program: x86.X86Program) -> x86.X86Program:
 
     blocks = program.blocks
     new_blocks = {label: pi_block(block) for label, block in blocks.items()}
-    return x86.X86Program(new_blocks, stack_space=program.stack_space)
+    return x86.X86Program(new_blocks, stack_space = program.stack_space)
 
 
 ##################################################
@@ -818,9 +854,9 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
     """
 
     prelude = [x86.NamedInstr('pushq', [x86.Reg('rbp')]),
-               x86.NamedInstr('movq', [x86.Reg('rsp'), x86.Reg('rbp')]),
-               x86.NamedInstr('subq', [x86.Immediate(program.stack_space),
-                                       x86.Reg('rsp')]),
+               x86.NamedInstr('movq',  [x86.Reg('rsp'), x86.Reg('rbp')]),
+               x86.NamedInstr('subq',  [x86.Immediate(program.stack_space),
+                                        x86.Reg('rsp')]),
                x86.Jmp('start')]
 
     conclusion = [x86.NamedInstr('addq', [x86.Immediate(program.stack_space),
@@ -831,7 +867,7 @@ def prelude_and_conclusion(program: x86.X86Program) -> x86.X86Program:
     new_blocks = program.blocks.copy()
     new_blocks['main'] = prelude
     new_blocks['conclusion'] = conclusion
-    return x86.X86Program(new_blocks, stack_space=program.stack_space)
+    return x86.X86Program(new_blocks, stack_space = program.stack_space)
 
 
 ##################################################
@@ -908,3 +944,4 @@ if __name__ == '__main__':
             except:
                 print('Error during compilation! **************************************************')
                 traceback.print_exception(*sys.exc_info())
+
