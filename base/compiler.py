@@ -92,7 +92,7 @@ def cast_insert(program: Program) -> Program:
             case Constant(n):
                 if isinstance(n, int):
                     return Prim('inject', [Constant(n), int])
-                if isinstance(n, str):
+                elif isinstance(n, str):
                     return Prim('inject', [Constant(n), str])
                 elif isinstance(n, bool):
                     return Prim('inject', [Constant(n), bool])
@@ -171,7 +171,8 @@ def typecheck(program: Program) -> Program:
 
         # TODO: HERE
         'tag_of':  [AnyVal],
-        'value_of':  [AnyVal]
+        'value_of':  [AnyVal],
+        'make_any': [AnyVal]
     }
 
     prim_output_types = {
@@ -188,7 +189,8 @@ def typecheck(program: Program) -> Program:
 
         # TODO: HERE
         'tag_of':  type,
-        'value_of':  AnyVal
+        'value_of':  AnyVal,
+        'make_any': AnyVal
     }
 
     def tc_exp(e: Expr, env: TEnv) -> type:
@@ -367,6 +369,20 @@ def reveal_casts(program: Program) -> Program:
         # 2. Inject compiles into the 'make_any' primitive that attaches a tag (select-instructions will compile it further)
         match stmt:
             # TODO: ADDED
+            # Project(e, ftype)
+            # ⇒
+            # Begin([Assign([tmp], e′)],
+            # IfExp(Compare(TagOf(tmp),[Eq()],
+            # [Constant(tagof (ftype))]),
+            # ValueOf(tmp, ftype)
+            # Call(Name('exit'), [])))
+            case Assign(x, Prim('project', [e, t])):
+                if e.tag == t:
+                    return [Assign(x, e.val)]
+                else:
+                    exit()
+            case Assign(x, Prim('value_of', [e, t])):
+                return [Assign(x, e.val)]
             case Assign(x, Prim('tag_of', [e, t])):
                 if e.tag == t:
                     return [Assign(x, e.val)]
@@ -376,12 +392,12 @@ def reveal_casts(program: Program) -> Program:
                 return [Assign(x, e.val)]
             case Assign(x, Prim('inject', [e, t])):
                 return [Assign(x, Prim('make_any', [e, t]))]
+
             # Inject(e, ftype)
             # ⇒
             # Call(Name('make_any'), [e′, Constant(tagof (ftype))])
-            case Assign (x, Prim('inject', [e, t])):
-
-                return [Assign(x, Prim('make_any', [e, Constant(mk_tag(t))]))]
+            # case Assign (x, Prim('inject', [e, t])):
+            #     return [Assign(x, Prim('make_any', [e, Constant(mk_tag(t))]))]
             # TODO: END
 
             case If(cond, then_stmts, else_stmts):
